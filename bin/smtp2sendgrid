@@ -1,0 +1,122 @@
+#!/usr/bin/env node
+var simplesmtp = require("simplesmtp")
+	, p = require("commander")
+	, log = require('nodeutil').logger.getInstance('smtp2sendgrid')
+  , uuid = require('node-uuid')
+  , ver = '0.0.1'
+  , fs = require("fs")
+  , os = require("os")
+	, mailer = require('../lib/sendgridapi');
+
+p.version(ver)
+  .option('-u, --username <sendgrid user name>', 'Specific the sendgrid username for login')
+  .option('-p, --password <sendgrid password>', 'Specific the sendgrid password for login')
+  .option('-t, --tmp <tmp file location>', 'We will save the content to file in the tmp path')
+  .parse(process.argv);
+
+if(!p.username || !p.password || !p.tmp) {
+  log.error('init server error, please check using "-h" to check...');
+	process.exit(1);
+} else {
+	mailer.init(p.username, p.password);
+}
+
+var smtp = simplesmtp.createServer();
+smtp.listen(25, function(err){
+	console.log('Error:', err);
+});
+
+smtp.on("startData", function(connection){
+	  var data_id = uuid.v1();
+    console.log("Message from:", connection.from);
+    console.log("Message to:", connection.to);
+		connection.mailid = data_id;
+    connection.saveStream = fs.createWriteStream(getPath(p.tmp, data_id));
+});
+
+smtp.on("data", function(connection, chunk){
+    connection.saveStream.write(chunk);
+});
+
+smtp.on("dataReady", function(connection, callback){
+    connection.saveStream.end(function(){
+			sendmail(connection.from, connection.to, connection.mailid, function(err, doc){
+				if(err) 
+					log.error('send mail error....');
+				else
+					log.info('send mail success, result:', doc);
+			});
+		});
+
+    callback(null, connection.emailid); // ABC1 is the queue id to be advertised to the client
+});
+
+function getPath(folderStr, filename) {
+  if(folderStr.endsWith('/'))
+		return folderStr + filename + '.txt';
+	else
+		return folderStr + '/' + filename + '.txt';
+}
+
+function sendmail(from, to, mailid, cb) {
+	var mailtxt = fs.readFileSync(getPath(p.tmp, mailid), "utf8");
+  var mailobj = parseMailTxt(mailtxt);
+  
+	mailer.sendmail({
+      from:     mailobj.from,
+      fromname: mailobj.fromname || mailobj.from,
+      to:       mailobj.to,
+      subject:  mailobj.subject,
+      html:    mailobj.content 
+  }, function(err, res){
+    if(err) {
+      console.log('send mail from sendgrid error:', err);
+    }
+    cb(err, res);
+  });
+  
+}
+
+function parseMailTxt(txt) {
+  console.log(typeof(txt));
+	var obj = {};
+	var txtarr = txt.split('\r\n');
+  var flag = false;
+  for(var i=0; i< txtarr.length; i++) {
+		var txt = txtarr[i];
+    if(!flag) {
+			if(txt.startsWith('Subject')) obj.subject = txt.split(': ')[1];
+  		if(txt.startsWith('From')){
+      	var fromObj = nameParser('From', txt);
+				obj.from = fromObj.mail;
+				obj.fromname = fromObj.name || fromObj.mail;
+			}
+			if(txt.startsWith('To')) {
+      	var toObj = nameParser('To', txt);
+				obj.to = toObj.mail;
+				obj.toname = toObj.name || toObj.mail;
+			}
+		}
+    if(txt.length == 0 || flag) {
+			flag = true;
+			if(obj.content)
+				obj.content += txt;
+			else
+				obj.content = txt;
+		}
+  }
+	return obj;
+}
+
+function nameParser(key, txt) {
+  var obj = {};
+	if(txt.startsWith(key) && txt.indexOf('<') > 0) {
+		if(txt.startsWith(key)) 
+			obj.mail = txt.split(': ')[1].split(' ')[1].replace(/</,'').replace(/>/,'');
+		if(txt.startsWith(key)) 
+			obj.name = txt.split(': ')[1].split(' ')[0].replace(/\"/,'').replace(/\"/,'');
+	} else {
+		if(txt.startsWith(key)) obj.mail = txt.split(': ')[1];
+	}
+  return obj;
+}

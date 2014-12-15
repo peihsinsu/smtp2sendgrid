@@ -1,0 +1,21 @@
+{
+  "name": "smtp2sendgrid",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "directories": {
+    "bin": "./bin"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^2.5.0",
+    "node-uuid": "^1.4.2",
+    "nodeutil": "0.0.45",
+    "sendgrid": "^1.4.0",
+    "simplesmtp": "^0.3.33"
+  }
+}
