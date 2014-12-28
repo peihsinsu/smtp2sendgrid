@@ -32,6 +32,29 @@ Sample command:
 sudo smtp2sendgrid -u [sendgrid-username] -p [sendgrid-password] -t [tmp-file-folder]
 ```
 
+# Test from node.js
+
+```
+var nu = require('nodeutil');
+
+var mailer = require('nodeutil').mailutil;
+var ip = 'the-ip-address-you-use-for-server';
+
+mailer.init(
+      {"smtpOptions":{"host":ip}, "sender": "NO-REPLY <no-reply@example.com>"}
+    );
+
+mailer.sendNodeMailAsync('your-mail@example.com',
+  'test mail send...',
+  'send mail OK!',
+  true,
+  function(){
+    console.log('Send mail done...');
+  }
+);
+```
+
 # Others
 
 Thank for use, report bug : simonsu.mail@gmail.com
+
