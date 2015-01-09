@@ -11,6 +11,7 @@ var simplesmtp = require("simplesmtp")
 p.version(ver)
   .option('-u, --username <sendgrid user name>', 'Specific the sendgrid username for login')
   .option('-p, --password <sendgrid password>', 'Specific the sendgrid password for login')
+  .option('-P, --port <smtp port>', 'Specific the smtp port for connect')
   .option('-t, --tmp <tmp file location>', 'We will save the content to file in the tmp path')
   .parse(process.argv);
 
@@ -22,8 +23,11 @@ if(!p.username || !p.password || !p.tmp) {
 }
 
 var smtp = simplesmtp.createServer();
-smtp.listen(25, function(err){
-	console.log('Error:', err);
+smtp.listen(p.port || 25, function(err){
+  if(err)
+		console.log('SMTP start error:', err);
+  else
+    console.log('SMTP server started in port %s', p.port || 25);
 });
 
 smtp.on("startData", function(connection){
@@ -40,6 +44,7 @@ smtp.on("data", function(connection, chunk){
 
 smtp.on("dataReady", function(connection, callback){
     connection.saveStream.end(function(){
+      log.info('Processing mailid:%s', connection.mailid);
 			sendmail(connection.from, connection.to, connection.mailid, function(err, doc){
 				if(err) 
 					log.error('send mail error....');
@@ -61,14 +66,18 @@ function getPath(folderStr, filename) {
 function sendmail(from, to, mailid, cb) {
 	var mailtxt = fs.readFileSync(getPath(p.tmp, mailid), "utf8");
   var mailobj = parseMailTxt(mailtxt);
-  
-	mailer.sendmail({
+  var opts = {
       from:     mailobj.from,
       fromname: mailobj.fromname || mailobj.from,
       to:       mailobj.to,
       subject:  mailobj.subject,
       html:    mailobj.content 
-  }, function(err, res){
+  };
+
+  if(mailobj['cc']) opts['cc'] = mailobj['cc'];
+  if(mailobj['bcc']) opts['bcc'] = mailobj['bcc'];
+
+	mailer.sendmail(opts, function(err, res){
     if(err) {
       console.log('send mail from sendgrid error:', err);
     }
@@ -95,6 +104,14 @@ function parseMailTxt(txt) {
       	var toObj = nameParser('To', txt);
 				obj.to = toObj.mail;
 				obj.toname = toObj.name || toObj.mail;
+			}
+			if(txt.startsWith('Cc')) {
+      	var ccObj = nameParser('Cc', txt);
+				obj.cc = ccObj.mail;
+			}
+			if(txt.startsWith('Bcc')) {
+      	var bccObj = nameParser('Bcc', txt);
+				obj.bcc = bccObj.mail;
 			}
 		}
     if(txt.length == 0 || flag) {
