@@ -20,7 +20,7 @@ mailer.sendNodeMailAsync('simonsu.mail@gmail.com',
 
 mailer.sendNodeMail({
 		from: "NO-REPLY <no-reply@micloud.tw>",
-    to:["simonsu.mail@gmail.com"],
+    to:["simonsu.mail@gmail.com","simonsu@mitac.com.tw"],
     subject: "test123..." + new Date().toString(),
     html:"<h1>TEST123</h1>",
     cc:["simonsu.mail+cc@gmail.com"],

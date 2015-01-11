@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 var simplesmtp = require("simplesmtp")
 	, p = require("commander")
-	, log = require('nodeutil').logger.getInstance('smtp2sendgrid')
+	, log = require('nodeutil').simplelog
   , uuid = require('node-uuid')
-  , ver = '0.0.1'
+  , ver = '0.0.2'
   , fs = require("fs")
   , os = require("os")
+  , _ = require("underscore")
 	, mailer = require('../lib/sendgridapi');
 
 p.version(ver)
@@ -34,7 +35,11 @@ smtp.on("startData", function(connection){
 	  var data_id = uuid.v1();
     console.log("Message from:", connection.from);
     console.log("Message to:", connection.to);
-		connection.mailid = data_id;
+		//connection.mailid = data_id;
+		connection.simplesmtp = {
+			mailid: data_id,
+			to: connection.to
+	  }
     connection.saveStream = fs.createWriteStream(getPath(p.tmp, data_id));
 });
 
@@ -44,8 +49,12 @@ smtp.on("data", function(connection, chunk){
 
 smtp.on("dataReady", function(connection, callback){
     connection.saveStream.end(function(){
-      log.info('Processing mailid:%s', connection.mailid);
-			sendmail(connection.from, connection.to, connection.mailid, function(err, doc){
+      log.info('Processing mailid:%s', connection.simplesmtp.mailid);
+			sendmail({
+				from: connection.from,
+				to: connection.simplesmtp.to,
+				mailid: connection.simplesmtp.mailid
+			}, function(err, doc){
 				if(err) 
 					log.error('send mail error....');
 				else
@@ -63,20 +72,37 @@ function getPath(folderStr, filename) {
 		return folderStr + '/' + filename + '.txt';
 }
 
-function sendmail(from, to, mailid, cb) {
+//function sendmail(from, to, mailid, cb) {
+function sendmail(opt, cb) {
+  var from = opt.from;
+  var to = opt.to;
+  var mailid = opt.mailid;
 	var mailtxt = fs.readFileSync(getPath(p.tmp, mailid), "utf8");
   var mailobj = parseMailTxt(mailtxt);
   var opts = {
       from:     mailobj.from,
       fromname: mailobj.fromname || mailobj.from,
-      to:       mailobj.to,
+      to:       formatArr(mailobj.to),
       subject:  mailobj.subject,
       html:    mailobj.content 
   };
 
-  if(mailobj['cc']) opts['cc'] = mailobj['cc'];
-  if(mailobj['bcc']) opts['bcc'] = mailobj['bcc'];
+  if(mailobj['cc']) opts['cc'] = formatArr(mailobj['cc']);
+  if(mailobj['bcc']) opts['bcc'] = formatArr(mailobj['bcc']);
 
+log.trace('orii[%s]:', typeof(opts.to), opts.to);
+log.trace('to[%s]:', typeof(mailobj.to), mailobj.to);
+log.trace('cc:[%s]', typeof(mailobj.cc), mailobj.cc);
+
+	opts.bcc =  _.without(opts.to, formatArr(mailobj.to));
+	if(mailobj.cc)
+		opts.bcc = _.without(opts.bcc, formatArr(mailobj.cc));
+
+log.trace('BCC:', opts.bcc);
+	
+	if(opts.bcc && opts.bcc.length == 0) {
+		delete opts.bcc
+	}
 	mailer.sendmail(opts, function(err, res){
     if(err) {
       console.log('send mail from sendgrid error:', err);
@@ -136,4 +162,10 @@ function nameParser(key, txt) {
 		if(txt.startsWith(key)) obj.mail = txt.split(': ')[1];
 	}
   return obj;
+}
+
+function formatArr(txt) {
+	return _.map(txt.split(','), function(v){
+		return v.trim();
+	});
 }
