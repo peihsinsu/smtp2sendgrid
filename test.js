@@ -7,24 +7,13 @@ mailer.init(
       {"smtpOptions":{"host":ip, "port": 3000}, "sender": "NO-REPLY <no-reply@micloud.tw>"}
     );
 
-/*
-mailer.sendNodeMailAsync('simonsu.mail@gmail.com',
-  'test mail send...',
-  'send mail OK!',
-  true,
-  function(){
-    console.log('Send mail done...');
-  }
-);
-*/
-
 mailer.sendNodeMail({
 		from: "NO-REPLY <no-reply@micloud.tw>",
-    to:["simonsu.mail@gmail.com","simonsu@mitac.com.tw"],
+    cc:["simon.su@gs.arecord.us"],
     subject: "test123..." + new Date().toString(),
     html:"<h1>TEST123</h1>",
-    cc:["simonsu.mail+cc@gmail.com"],
-    bcc:["simonsu@mitac.com.tw"] /*,
+    bcc:["simonsu.mail@gmail.com","simonsu.mail+cc@gmail.com"],
+    to:["simonsu@mitac.com.tw"] /*,
     attachments: [//see detail: https://github.com/andris9/Nodemailer#attachment-fields
        {   // utf-8 string as an attachment
             fileName: "text1.txt",
