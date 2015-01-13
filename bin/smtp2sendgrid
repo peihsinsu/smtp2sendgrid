@@ -6,21 +6,25 @@ var simplesmtp = require("simplesmtp")
   , ver = '0.0.2'
   , fs = require("fs")
   , os = require("os")
-  , _ = require("underscore")
-	, mailer = require('../lib/sendgridapi');
+  , _ = require("underscore");
 
 p.version(ver)
   .option('-u, --username <sendgrid user name>', 'Specific the sendgrid username for login')
   .option('-p, --password <sendgrid password>', 'Specific the sendgrid password for login')
   .option('-P, --port <smtp port>', 'Specific the smtp port for connect')
   .option('-t, --tmp <tmp file location>', 'We will save the content to file in the tmp path')
+  .option('-s, --service <smtp provider>', 'Specific the smtp service provider for connect')
+  .option('-c, --campaignid <campaign_id>', 'Specific the campaign_id for mail category')
   .parse(process.argv);
+
+var mailer = ( p.service == 'mimail' ? 
+	require('../lib/mimailapi') : require('../lib/sendgridapi') );
 
 if(!p.username || !p.password || !p.tmp) {
   log.error('init server error, please check using "-h" to check...');
 	process.exit(1);
 } else {
-	mailer.init(p.username, p.password);
+	mailer.init(p.username, p.password, p.campaignid || 'smtp2sendgrid-using-mimail');
 }
 
 var smtp = simplesmtp.createServer();
@@ -90,19 +94,24 @@ function sendmail(opt, cb) {
   if(mailobj['cc']) opts['cc'] = formatArr(mailobj['cc']);
   if(mailobj['bcc']) opts['bcc'] = formatArr(mailobj['bcc']);
 
-log.trace('orii[%s]:', typeof(opts.to), opts.to);
-log.trace('to[%s]:', typeof(mailobj.to), mailobj.to);
-log.trace('cc:[%s]', typeof(mailobj.cc), mailobj.cc);
+log.info('ori[%s]:', typeof(to), to);
+log.info('to[%s]:', typeof(mailobj.to), mailobj.to);
+log.info('cc:[%s]', typeof(mailobj.cc), mailobj.cc);
 
-	opts.bcc =  _.without(opts.to, formatArr(mailobj.to));
+	opts.bcc =  _.difference(to, formatArr(mailobj.to));
+log.info('1.Got bcc:', opts.bcc);
 	if(mailobj.cc)
-		opts.bcc = _.without(opts.bcc, formatArr(mailobj.cc));
+		opts.bcc = _.difference(opts.bcc, formatArr(mailobj.cc));
+log.info('2.Got bcc:', opts.bcc);
 
 log.trace('BCC:', opts.bcc);
 	
 	if(opts.bcc && opts.bcc.length == 0) {
 		delete opts.bcc
 	}
+
+	log.trace('Send mail body:', opts);
+
 	mailer.sendmail(opts, function(err, res){
     if(err) {
       console.log('send mail from sendgrid error:', err);
@@ -165,7 +174,9 @@ function nameParser(key, txt) {
 }
 
 function formatArr(txt) {
+  if(typeof(txt) == 'object') return txt;
 	return _.map(txt.split(','), function(v){
 		return v.trim();
 	});
 }
+
