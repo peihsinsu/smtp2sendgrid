@@ -1,6 +1,6 @@
 {
   "name": "smtp2sendgrid",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "request": "*",
     "commander": "^2.5.0",
     "node-uuid": "^1.4.2",
     "nodeutil": "0.0.45",
