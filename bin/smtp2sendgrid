@@ -6,7 +6,9 @@ var simplesmtp = require("simplesmtp")
   , ver = '0.0.2'
   , fs = require("fs")
   , os = require("os")
-  , _ = require("underscore");
+  , _ = require("underscore")
+	, MailParser = require("mailparser").MailParser
+	, mailparser = new MailParser();
 
 p.version(ver)
   .option('-u, --username <sendgrid user name>', 'Specific the sendgrid username for login')
@@ -39,6 +41,7 @@ smtp.on("startData", function(connection){
 	  var data_id = uuid.v1();
     console.log("Message from:", connection.from);
     console.log("Message to:", connection.to);
+    console.log("Message:", connection);
 		//connection.mailid = data_id;
 		connection.simplesmtp = {
 			mailid: data_id,
@@ -82,82 +85,83 @@ function sendmail(opt, cb) {
   var to = opt.to;
   var mailid = opt.mailid;
 	var mailtxt = fs.readFileSync(getPath(p.tmp, mailid), "utf8");
-  var mailobj = parseMailTxt(mailtxt);
-  var opts = {
-      from:     mailobj.from,
-      fromname: mailobj.fromname || mailobj.from,
-      to:       formatArr(mailobj.to),
-      subject:  mailobj.subject,
-      html:    mailobj.content 
-  };
+  parseMailTxt(mailtxt, function(mailobj){
 
-  if(mailobj['cc']) opts['cc'] = formatArr(mailobj['cc']);
-  if(mailobj['bcc']) opts['bcc'] = formatArr(mailobj['bcc']);
+		var opts = mailobj;
+		if(mailobj['cc']) opts['cc'] = formatArr(mailobj['cc']);
+		if(mailobj['bcc']) opts['bcc'] = formatArr(mailobj['bcc']);
 
-log.info('ori[%s]:', typeof(to), to);
-log.info('to[%s]:', typeof(mailobj.to), mailobj.to);
-log.info('cc:[%s]', typeof(mailobj.cc), mailobj.cc);
+	log.info('ori[%s]:', typeof(to), to);
+	log.info('to[%s]:', typeof(mailobj.to), mailobj.to);
+	log.info('cc:[%s]', typeof(mailobj.cc), mailobj.cc);
 
-	opts.bcc =  _.difference(to, formatArr(mailobj.to));
-log.info('1.Got bcc:', opts.bcc);
-	if(mailobj.cc)
-		opts.bcc = _.difference(opts.bcc, formatArr(mailobj.cc));
-log.info('2.Got bcc:', opts.bcc);
+		opts.bcc =  _.difference(to, formatArr(mailobj.to));
+	log.info('1.Got bcc:', opts.bcc);
+		if(mailobj.cc)
+			opts.bcc = _.difference(opts.bcc, formatArr(mailobj.cc));
+	log.info('2.Got bcc:', opts.bcc);
 
-log.trace('BCC:', opts.bcc);
-	
-	if(opts.bcc && opts.bcc.length == 0) {
-		delete opts.bcc
-	}
+	log.trace('BCC:', opts.bcc);
+		
+		if(opts.bcc && opts.bcc.length == 0) {
+			delete opts.bcc
+		}
 
-	log.trace('Send mail body:', opts);
+		log.trace('Send mail body:', opts);
 
-	mailer.sendmail(opts, function(err, res){
-    if(err) {
-      console.log('send mail from sendgrid error:', err);
-    }
-    cb(err, res);
-  });
-  
+		mailer.sendmail(opts, function(err, res){
+			if(err) {
+				console.log('send mail from sendgrid error:', err);
+			}
+			cb(err, res);
+		});
+	});
 }
 
-function parseMailTxt(txt) {
-  console.log(typeof(txt));
+function parseMailTxt(txt, callback) {
 	var obj = {};
-	var txtarr = txt.split('\r\n');
-  var flag = false;
-  for(var i=0; i< txtarr.length; i++) {
-		var txt = txtarr[i];
-    if(!flag) {
-			if(txt.startsWith('Subject')) obj.subject = txt.split(': ')[1];
-  		if(txt.startsWith('From')){
-      	var fromObj = nameParser('From', txt);
-				obj.from = fromObj.mail;
-				obj.fromname = fromObj.name || fromObj.mail;
-			}
-			if(txt.startsWith('To')) {
-      	var toObj = nameParser('To', txt);
-				obj.to = toObj.mail;
-				obj.toname = toObj.name || toObj.mail;
-			}
-			if(txt.startsWith('Cc')) {
-      	var ccObj = nameParser('Cc', txt);
-				obj.cc = ccObj.mail;
-			}
-			if(txt.startsWith('Bcc')) {
-      	var bccObj = nameParser('Bcc', txt);
-				obj.bcc = bccObj.mail;
+	mailparser.on("end", function(mail_object){
+		console.log("From:", mail_object.from);
+		obj.from = mail_object.from[0].address;
+		console.log("To:", mail_object.to);
+		obj.to = [];
+		for(var i=0; i<mail_object.to.length; i++){
+			obj.to[i] = mail_object.to[i].address;
+		}
+		if(mail_object.cc){
+			obj.cc = [];
+			for(var i=0; i<mail_object.cc.length; i++){
+				obj.cc[i] = mail_object.cc[i].address;
 			}
 		}
-    if(txt.length == 0 || flag) {
-			flag = true;
-			if(obj.content)
-				obj.content += txt;
-			else
-				obj.content = txt;
+		if(mail_object.bcc){
+			obj.bcc = [];
+			for(var i=0; i<mail_object.bcc.length; i++){
+				obj.bcc[i] = mail_object.bcc[i].address;
+			}
 		}
-  }
-	return obj;
+		console.log("Subject:", mail_object.subject);
+		obj.subject = mail_object.subject;
+		if(mail_object.text){
+			obj.text = mail_object.text;
+		}
+		if(mail_object.html){
+			obj.html = mail_object.html;
+		}
+		if(mail_object.attachments){
+			obj.files = [];
+			for(var i=0; i<mail_object.attachments.length; i++){
+				obj.files[i] = {};
+				obj.files[i].filename = mail_object.attachments[i].fileName;
+				obj.files[i].contentType = mail_object.attachments[i].contentType;
+				obj.files[i].content = mail_object.attachments[i].content;
+			}
+		}
+		log.debug(obj);
+		callback(obj);
+	});
+	mailparser.write(txt);
+	mailparser.end();
 }
 
 function nameParser(key, txt) {
