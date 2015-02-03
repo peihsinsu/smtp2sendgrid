@@ -14,7 +14,7 @@
 		"Charles Fan": "https://www.linkedin.com/pub/chengwei%E8%8C%83%E6%8C%AF%E5%81%89-chengwei%E8%8C%83%E6%8C%AF%E5%81%89/84/9b1/613"
   "license": "ISC",
   "dependencies": {
-		"request": "*",
+    "request": "*",
     "commander": "^2.5.0",
     "mailparser": "^0.4.8",
     "node-uuid": "^1.4.2",
