@@ -1,6 +1,6 @@
 {
   "name": "smtp2sendgrid",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -12,6 +12,7 @@
   "author": {
 		"Simon Su": "http://about.me/peihsinsu",
 		"Charles Fan": "https://www.linkedin.com/pub/chengwei%E8%8C%83%E6%8C%AF%E5%81%89-chengwei%E8%8C%83%E6%8C%AF%E5%81%89/84/9b1/613"
+	},
   "license": "ISC",
   "dependencies": {
     "request": "*",
