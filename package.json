@@ -14,7 +14,6 @@
 		"Simon Su": "http://about.me/peihsinsu",
 		"Charles Fan": "http://goo.gl/wWEyiD"
   },
->>>>>>> d2db9b4c81c95d450af948c5fbaef9721b0cb6d3
   "license": "ISC",
   "dependencies": {
     "request": "*",
