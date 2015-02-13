@@ -2,19 +2,22 @@
 var simplesmtp = require("simplesmtp")
 	, p = require("commander")
 	, log = require('nodeutil').simplelog
-//	,	log = require('nodeutil').logger.getInstance('server')
+	//,	log = require('nodeutil').logger.getInstance('server')
   , uuid = require('node-uuid')
   , ver = '0.0.2'
   , fs = require("fs")
   , os = require("os")
   , _ = require("underscore")
-	, MailParser = require("mailparser").MailParser;
+	, MailParser = require("mailparser").MailParser
+	,	exec = require('child_process').exec;
 
 p.version(ver)
   .option('-u, --username <sendgrid user name>', 'Specific the sendgrid username for login')
   .option('-p, --password <sendgrid password>', 'Specific the sendgrid password for login')
   .option('-P, --port <smtp port>', 'Specific the smtp port for connect')
   .option('-t, --tmp <tmp file location>', 'We will save the content to file in the tmp path')
+  .option('-b, --successBackup <success file location>', 'We will move the success file to backup path')
+  .option('-e, --errPath <error file location>', 'The file will be moved to error holder if it had error in delivering')
   .option('-s, --service <smtp provider>', 'Specific the smtp service provider for connect')
   .option('-c, --campaignid <campaign_id>', 'Specific the campaign_id for mail category')
   .parse(process.argv);
@@ -28,6 +31,32 @@ if(!p.username || !p.password || !p.tmp) {
 } else {
 	mailer.init(p.username, p.password, p.campaignid || 'smtp2sendgrid-using-mimail');
 }
+
+var successBackup = null
+	, errPath = null;
+
+if(p.successBackup) {
+	pathChecking(p.successBackup, function(result) {
+		if(result)
+			successBackup = p.successBackup;
+		else {
+			log.error('init server error, the backup folder : %s does not exist',p.successBackup);
+			process.exit(1);
+		}
+	});
+}
+
+if(p.errPath) {
+	pathChecking(p.errPath, function(result) {
+		if(result) 
+			errPath = p.errPath;
+		else {
+			log.error('init server error, the backup folder : %s does not exist',p.errPath);
+			process.exit(1);
+		}
+	});
+}
+
 
 var smtp = simplesmtp.createServer();
 smtp.listen(p.port || 25, function(err){
@@ -56,21 +85,40 @@ smtp.on("data", function(connection, chunk){
 
 smtp.on("dataReady", function(connection, callback){
     connection.saveStream.end(function(){
-      log.info('Processing mailid:%s', connection.simplesmtp.mailid);
+			var mailID = connection.simplesmtp.mailid;
+      log.info('Processing mailid:%s', mailID);
 			sendmail({
 				from: connection.from,
 				to: connection.simplesmtp.to,
 				mailid: connection.simplesmtp.mailid
 			}, function(err, doc){
-				if(err) 
+				if(err || doc.error || doc == 'Not Found'){ 
+					if(doc.error) log.error('mail service error: ',doc.error);
+					if(doc == 'Not Found') log.error('mail service not found');
 					log.error('send mail error....');
-				else
+					if(errPath) moveFile(errPath, getPath(p.tmp, mailID));	
+				}
+				else{
 					log.info('send mail success, result:', doc);
+					if(successBackup) moveFile(successBackup, getPath(p.tmp, mailID));	
+				}
 			});
 		});
 
     callback(null, connection.emailid); // ABC1 is the queue id to be advertised to the client
 });
+
+function moveFile(destination, file) {
+	fs.exists(file, function(exsits){
+		if(exsits) {
+			log.debug('Start move %s to %s', file, destination);
+			return exec('mv ' + file + ' ' + destination, function(err){
+				if(err) log.error(err);
+			})
+		}
+		else return log.error('%s does not exsit',file);
+	});
+}
 
 function getPath(folderStr, filename) {
   if(folderStr.endsWith('/'))
@@ -203,3 +251,9 @@ function formatArr(txt) {
 	});
 }
 
+function pathChecking(path, callback){
+	if(typeof(path) !== 'string') return false;
+	fs.exists(path, function(exists){
+		callback(exists);
+	});
+}
