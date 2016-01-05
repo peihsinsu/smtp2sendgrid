@@ -11,16 +11,17 @@
   },
   "github": "https://github.com/peihsinsu/smtp2sendgrid",
   "author": {
-		"Simon Su": "http://about.me/peihsinsu",
-		"Charles Fan": "http://goo.gl/wWEyiD"
+    "Simon Su": "http://about.me/peihsinsu",
+    "Charles Fan": "http://goo.gl/wWEyiD"
   },
   "license": "ISC",
   "dependencies": {
-    "request": "*",
     "commander": "^2.5.0",
     "mailparser": "^0.4.8",
     "node-uuid": "^1.4.2",
+    "nodemailer": "^1.11.0",
     "nodeutil": "0.0.46",
+    "request": "*",
     "sendgrid": "^1.4.0",
     "simplesmtp": "^0.3.33",
     "underscore": "^1.7.0"
